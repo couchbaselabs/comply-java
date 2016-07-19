@@ -77,10 +77,7 @@ public class Database {
     public static ResponseEntity<String> createCompany(final Bucket bucket, JsonObject data) {
         JsonDocument document = JsonDocument.create(data.getString("website"), data.put("_id", data.getString("website")).put("_type", "Company"));
         bucket.upsert(document);
-        JsonObject responseData = JsonObject.create()
-                .put("success", true)
-                .put("data", data);
-        return new ResponseEntity<String>(responseData.toString(), HttpStatus.OK);
+        return new ResponseEntity<String>(document.content().toString(), HttpStatus.OK);
         /*String queryStr = "UPSERT INTO `" + bucket.name() + "` (KEY, VALUE) VALUES " +
                 "($1, {'_type': 'Company', '_id': $2, 'createdON': $3, 'active': true})";
         ParameterizedN1qlQuery query = ParameterizedN1qlQuery.parameterized(queryStr, JsonArray.create().add(data.getString("website")).add(data.getString("website")).add("1111"));
@@ -133,7 +130,7 @@ public class Database {
         String documentId = UUID.randomUUID().toString();
         JsonArray users = data.getArray("users");
         users.add(data.getString("owner"));
-        JsonDocument document = JsonDocument.create(documentId, data.put("_id", documentId).put("_type", "Project").put("users", users));
+        JsonDocument document = JsonDocument.create(documentId, data.put("_id", documentId).put("_type", "Project").put("users", users).put("createdON", (new Date()).toString()));
         bucket.upsert(document);
         JsonObject responseData = JsonObject.create()
                 .put("success", true)
@@ -144,6 +141,20 @@ public class Database {
         ParameterizedN1qlQuery query = ParameterizedN1qlQuery.parameterized(queryStr, JsonArray.create().add(data.getString("website")).add(data.getString("website")).add("1111"));
         N1qlQueryResult queryResult = bucket.query(query);
         return extractResultOrThrow(queryResult);*/
+    }
+
+    public static ResponseEntity<String> projectAddUser(final Bucket bucket, JsonObject data) {
+        JsonDocument user = bucket.get(data.getString("email"));
+        JsonDocument project = bucket.get(data.getString("projectId"));
+        JsonObject jsonProject = project.content();
+        JsonArray projectUsers = jsonProject.getArray("users");
+        if(!projectUsers.toString().contains(data.getString("email"))) {
+            projectUsers.add(data.getString("email"));
+        }
+        jsonProject.put("users", projectUsers);
+        project = JsonDocument.create(jsonProject.getString("_id"), jsonProject);
+        bucket.upsert(project);
+        return new ResponseEntity<String>(user.content().toString(), HttpStatus.OK);
     }
 
 
@@ -196,7 +207,7 @@ public class Database {
         String taskId = UUID.randomUUID().toString();
         JsonArray users = data.getArray("users");
         users.add(data.getString("owner"));
-        JsonDocument document = JsonDocument.create(taskId, data.put("_id", taskId).put("_type", "Task").put("users", users));
+        JsonDocument document = JsonDocument.create(taskId, data.put("_id", taskId).put("_type", "Task").put("users", users).put("createdON", (new Date()).toString()));
         bucket.upsert(document);
 
         JsonDocument project = bucket.get(projectId);
@@ -245,6 +256,16 @@ public class Database {
         ParameterizedN1qlQuery query = ParameterizedN1qlQuery.parameterized(queryStr, JsonArray.create().add(data.getString("log")).add(currentTaskHistory.getString("createdAt")).add(data.getString("userId")), params);
         N1qlQueryResult queryResult = bucket.query(query);
         return extractResultOrThrow(queryResult);
+    }
+
+    public static ResponseEntity<String> taskAssignUser(final Bucket bucket, JsonObject data) {
+        JsonDocument user = bucket.get(data.getString("userId"));
+        JsonDocument task = bucket.get(data.getString("taskId"));
+        JsonObject jsonTask = task.content();
+        jsonTask.put("assignedTo", data.getString("userId"));
+        task = JsonDocument.create(jsonTask.getString("_id"), jsonTask);
+        bucket.upsert(task);
+        return new ResponseEntity<String>(user.content().toString(), HttpStatus.OK);
     }
 
 

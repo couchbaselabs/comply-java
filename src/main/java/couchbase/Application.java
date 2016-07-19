@@ -143,7 +143,8 @@ public class Application implements Filter {
 
     @RequestMapping(value="/project/addUser", method= RequestMethod.POST)
     public Object projectAddUser(@RequestBody String json) {
-        return new ResponseEntity<String>(JsonObject.create().put("userId", 1).toString(), HttpStatus.OK);
+        JsonObject jsonData = JsonObject.fromJson(json);
+        return Database.projectAddUser(bucket(), jsonData);
     }
 
     @RequestMapping(value="/project/getUsers/{projectId}", method= RequestMethod.GET)
@@ -186,7 +187,8 @@ public class Application implements Filter {
 
     @RequestMapping(value="/task/assignUser", method= RequestMethod.POST)
     public Object taskAssignUser(@RequestBody String json) {
-        return new ResponseEntity<String>(JsonObject.create().put("userId", 1).toString(), HttpStatus.OK);
+        JsonObject jsonData = JsonObject.fromJson(json);
+        return Database.taskAssignUser(bucket(), jsonData);
     }
 
     @RequestMapping(value="/task/addHistory", method= RequestMethod.POST)

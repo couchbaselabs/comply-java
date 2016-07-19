@@ -31,7 +31,6 @@ export class TasksPage {
         route.params.subscribe(params => {
             this.projectId = params["projectId"];
         });
-        //this.projectId = routeParams.get("projectId");
         this.project = { _id: "", name: "", description: "", owner: <IUser> {}, users: [], tasks: null, permalink:"" };
         this.getProject(this.projectId);
         this.getUsers();

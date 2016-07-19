@@ -73,18 +73,6 @@ export class TaskPage {
         this.comment = "";
     }
 
-    savePhoto(description:string){
-        this.utility.makeFileRequest("/api/cdn/add", [], this.userPhoto, description, this.authManager.getAuthToken(), this.taskId).then((result) => {
-            this.task.history.unshift(result);
-        }, (error) => {
-            console.error(error);
-        });
-    }
-
-    fileEventUpload(photo:any){
-        this.userPhoto=photo.target.files[0];
-    }
-
     addUser(taskUser: string) {
         if (taskUser && taskUser != "") {
             this.utility.makePostRequest("/api/task/addUser", [], {email: taskUser, taskId: this.taskId}).then((result) => {

@@ -11,8 +11,6 @@ import { CompaniesPage } from "./app/components/companies/companies";
 import { ProjectsPage } from "./app/components/projects/projects";
 import { TaskPage } from "./app/components/task/task";
 import { TasksPage } from "./app/components/tasks/tasks";
-import { TasksROPage } from "./app/components/tasks/tasksRO";
-import { TaskROPage } from "./app/components/task/taskRO";
 
 if (environment.production) {
     enableProdMode();
@@ -23,9 +21,7 @@ export const AppRoutes: RouterConfig = [
     { path: "companies", component: CompaniesPage },
     { path: "", component: ProjectsPage },
     { path: "task/:taskId", component: TaskPage },
-    { path: "tasks/:projectId", component: TasksPage },
-    { path: "tasksro", component: TasksROPage },
-    { path: "taskro", component: TaskROPage }
+    { path: "tasks/:projectId", component: TasksPage }
 ];
 
 bootstrap(AppComponent, [AuthManager, Utility, [provideRouter(AppRoutes)], HTTP_PROVIDERS]);

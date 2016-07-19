@@ -13,7 +13,7 @@
         </thead>
         <tbody>
             <tr *ngFor="let company of companies">
-                <td><a href="{{company.id}}">{{company.name}}</a></td>
+                <td><a href="{{company._id}}">{{company.name}}</a></td>
                 <td>{{company.address.city}}</td>
                 <td>{{company.address.state}}</td>
                 <td>{{company.website}}</td>
