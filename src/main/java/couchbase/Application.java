@@ -202,41 +202,4 @@ public class Application implements Filter {
         return new ResponseEntity<String>(JsonObject.create().put("userId", 1).toString(), HttpStatus.OK);
     }
 
-
-
-    @RequestMapping(value="/getAll", method= RequestMethod.GET)
-    public Object getAll() {
-        return Database.getAll(bucket());
-    }
-
-    @RequestMapping(value="/get", method= RequestMethod.GET)
-    public Object getByDocumentId(@RequestParam String document_id) {
-        if(document_id.equals("")) {
-            return new ResponseEntity<String>(JsonObject.create().put("message", "A document id is required").toString(), HttpStatus.BAD_REQUEST);
-        }
-        return Database.getByDocumentId(bucket(), document_id);
-    }
-
-    @RequestMapping(value="/delete", method=RequestMethod.POST)
-    public Object delete(@RequestBody String json) {
-        JsonObject jsonData = JsonObject.fromJson(json);
-        if(jsonData.getString("document_id") == null || jsonData.getString("document_id").equals("")) {
-            return new ResponseEntity<String>(JsonObject.create().put("message", "A document id is required").toString(), HttpStatus.BAD_REQUEST);
-        }
-        return Database.delete(bucket(), jsonData.getString("document_id"));
-    }
-
-    @RequestMapping(value="/save", method=RequestMethod.POST)
-    public Object save(@RequestBody String json) {
-        JsonObject jsonData = JsonObject.fromJson(json);
-        if(jsonData.getString("firstname") == null || jsonData.getString("firstname").equals("")) {
-            return new ResponseEntity<String>(JsonObject.create().put("message", "A firstname is required").toString(), HttpStatus.BAD_REQUEST);
-        } else if(jsonData.getString("lastname") == null || jsonData.getString("lastname").equals("")) {
-            return new ResponseEntity<String>(JsonObject.create().put("message", "A lastname is required").toString(), HttpStatus.BAD_REQUEST);
-        } else if(jsonData.getString("email") == null || jsonData.getString("email").equals("")) {
-            return new ResponseEntity<String>(JsonObject.create().put("message", "An email is required").toString(), HttpStatus.BAD_REQUEST);
-        }
-        return Database.save(bucket(), jsonData);
-    }
-
 }
