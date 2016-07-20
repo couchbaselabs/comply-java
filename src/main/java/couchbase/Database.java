@@ -17,69 +17,142 @@ public class Database {
 
     private Database() { }
 
+    /*
+     * ###################################################
+     * ################# User Functions ##################
+     * ###################################################
+     */
 
 
+    /*
+     * Get a single user document based on its id information. The result will be an array of objects.
+     */
     public static List<Map<String, Object>> getUserById(final Bucket bucket, String userId) {
         String queryStr = "SELECT _id, _type, name, address, company, username, phone, `password` " +
                        "FROM `" + bucket.name() + "` AS users " +
-                       "WHERE META(users).id = $1";
+                       "WHERE _type = 'User' AND META(users).id = $1";
         ParameterizedN1qlQuery query = ParameterizedN1qlQuery.parameterized(queryStr, JsonArray.create().add(userId));
         N1qlQueryResult queryResult = bucket.query(query);
         return extractResultOrThrow(queryResult);
     }
 
+    /*
+     * Get all documents that have a property called _type.  The result will be an array of objects.
+     */
     public static List<Map<String, Object>> getUsers(final Bucket bucket) {
         String queryStr = "SELECT _id, _type, name, address, company, username, phone, `password` FROM `" + bucket.name() + "` WHERE _type = 'User'";
         N1qlQueryResult queryResult = bucket.query(N1qlQuery.simple(queryStr));
         return extractResultOrThrow(queryResult);
     }
 
+    /*
+     * Attempt to get a document by the username which also represents a document key.  If the document is found, use Bcrypt to
+     * validate the password.  If everything succeeds, return the user document itself.  The password returned will be Bcrypted, not plain text.
+     */
     public static ResponseEntity<String> login(final Bucket bucket, String username, String password) {
+        JsonObject response;
+        HttpStatus responseStatus;
         JsonDocument user = bucket.get(username);
-        JsonObject jsonUser = user.content();
-        if(BCrypt.checkpw(password, jsonUser.getString("password"))) {
-            return new ResponseEntity<String>(user.content().toString(), HttpStatus.OK);
+        if(user == null) {
+            response = JsonObject.create().put("error", 401).put("message", "The username provided does not exist or was not correct");
+            responseStatus = HttpStatus.UNAUTHORIZED;
         } else {
-            return new ResponseEntity<String>(user.content().toString(), HttpStatus.OK);
+            JsonObject jsonUser = user.content();
+            if(BCrypt.checkpw(password, jsonUser.getString("password"))) {
+                response = jsonUser;
+                responseStatus = HttpStatus.OK;
+            } else {
+                response = JsonObject.create().put("error", 401).put("message", "The password provided is not correct");
+                responseStatus = HttpStatus.UNAUTHORIZED;
+            }
         }
+        return new ResponseEntity<String>(response.toString(), responseStatus);
     }
 
-    public static ResponseEntity<String> createUser(final Bucket bucket, JsonObject data) {
-        JsonDocument document = JsonDocument.create(data.getString("username"), data.put("_id", data.getString("username")).put("_type", "User").put("password", BCrypt.hashpw(data.getString("password"), BCrypt.gensalt())));
-        bucket.upsert(document);
-        return new ResponseEntity<String>(document.content().toString(), HttpStatus.OK);
+    /*
+     * Attempt to create a new user document based on the data that was passed through.  To keep things simple, the document id will be
+     * the username.  The password will be Bcrypted and stored for security. The insert will fail if the document id already exists.
+     */
+    public static ResponseEntity<String> createUser(final Bucket bucket, JsonObject data, String username, String password) {
+        JsonObject response;
+        HttpStatus responseStatus;
+        JsonDocument document = JsonDocument.create(username, data.put("_id", username).put("_type", "User").put("password", BCrypt.hashpw(password, BCrypt.gensalt())));
+        try {
+            bucket.insert(document);
+            response = document.content();
+            responseStatus = HttpStatus.OK;
+        } catch (Exception e) {
+            response = JsonObject.create().put("error", 409).put("message", e.getMessage());
+            responseStatus = HttpStatus.CONFLICT;
+        }
+        return new ResponseEntity<String>(response.toString(), responseStatus);
     }
 
+
+    /*
+     * ###################################################
+     * ############### Company Endpoints #################
+     * ###################################################
+     */
+
+
+    /*
+     * Get a company from the database based on its document _type and particular id.  The data returned is an array of objects.
+     */
     public static List<Map<String, Object>> getCompanyById(final Bucket bucket, String companyId) {
         String queryStr = "SELECT _id, _type, name, address, phone, website " +
                        "FROM `" + bucket.name() + "` AS companies " +
-                       "WHERE META(companies).id = $1";
+                       "WHERE _type = 'Company' AND META(companies).id = $1";
         ParameterizedN1qlQuery query = ParameterizedN1qlQuery.parameterized(queryStr, JsonArray.create().add(companyId));
         N1qlQueryResult queryResult = bucket.query(query);
         return extractResultOrThrow(queryResult);
     }
 
+    /*
+     * Get all companies from the database based on the document _type
+     */
     public static List<Map<String, Object>> getCompanies(final Bucket bucket) {
         String queryStr = "SELECT _id, _type, name, address, phone, website FROM `" + bucket.name() + "` WHERE _type = 'Company'";
         N1qlQueryResult queryResult = bucket.query(N1qlQuery.simple(queryStr));
         return extractResultOrThrow(queryResult);
     }
 
+    /*
+     * Create a company and use the website as the document id
+     */
     public static ResponseEntity<String> createCompany(final Bucket bucket, JsonObject data) {
+        JsonObject response;
+        HttpStatus responseStatus;
         JsonDocument document = JsonDocument.create(data.getString("website"), data.put("_id", data.getString("website")).put("_type", "Company"));
-        bucket.upsert(document);
-        return new ResponseEntity<String>(document.content().toString(), HttpStatus.OK);
+        try {
+            bucket.insert(document);
+            response = document.content();
+            responseStatus = HttpStatus.OK;
+        } catch (Exception e) {
+            response = JsonObject.create().put("error", 409).put("message", e.getMessage());
+            responseStatus = HttpStatus.CONFLICT;
+        }
+        return new ResponseEntity<String>(response.toString(), responseStatus);
     }
 
 
+    /*
+     * ###################################################
+     * ################ Project Endpoints ################
+     * ###################################################
+     */
 
+    /*
+     * Get a particular project by the project id.  With the project document includes an expanded owner property, rather than just the owner id.  It also
+     * includes expanded users rather than an array of user ids, and it includes expanded tasks rather than a list of tasks.  The result is an array of objects.
+     */
     public static List<Map<String, Object>> getProjectById(final Bucket bucket, String projectId) {
         String queryStr = "SELECT _id, createdON, description,name, " +
-                "(SELECT _id,_type,active,address, company,createdON,name,`password`,phone " +
-                "FROM `" + bucket.name() + "` USE KEYS c.owner)[0] as owner,(SELECT _id,_type,active, " +
-                "address,company,createdON,name,`password`,phone FROM `" + bucket.name() + "` USE KEYS " +
-                "c.users) AS users, (SELECT _id,name,description,owner,assignedTo,Users, " +
-                "history,permalink FROM `" + bucket.name() + "` USE KEYS c.tasks) as tasks, permalink from " +
+                "(SELECT _id, _type, active, address, company, createdON, name, `password`, phone " +
+                "FROM `" + bucket.name() + "` USE KEYS c.owner)[0] as owner, (SELECT _id, _type, active, " +
+                "address, company, createdON, name, `password`, phone FROM `" + bucket.name() + "` USE KEYS " +
+                "c.users) AS users, (SELECT _id, name, description, owner, assignedTo, Users, " +
+                "history, permalink FROM `" + bucket.name() + "` USE KEYS c.tasks) as tasks, permalink FROM " +
                 " `" + bucket.name() + "` c WHERE c._id=$1";
         ParameterizedN1qlQuery query = ParameterizedN1qlQuery.parameterized(queryStr, JsonArray.create().add(projectId));
         N1qlQueryResult queryResult = bucket.query(query);
@@ -103,12 +176,6 @@ public class Database {
         String queryStr = "SELECT _id, _type, name, description, tasks, users, owner FROM `" + bucket.name() + "` WHERE _type = 'Project' AND ANY x IN users SATISFIES x = $1 END";
         ParameterizedN1qlQuery query = ParameterizedN1qlQuery.parameterized(queryStr, JsonArray.create().add(userId));
         N1qlQueryResult queryResult = bucket.query(query);
-        return extractResultOrThrow(queryResult);
-    }
-
-    public static List<Map<String, Object>> getOtherProjects(final Bucket bucket) {
-        String queryStr = "SELECT _id, _type, name, description, tasks, users, owner FROM `" + bucket.name() + "` WHERE _type = 'Project'";
-        N1qlQueryResult queryResult = bucket.query(N1qlQuery.simple(queryStr));
         return extractResultOrThrow(queryResult);
     }
 
@@ -153,7 +220,7 @@ public class Database {
         return extractResultOrThrow(queryResult);
     }
 
-    public static List<Map<String, Object>> getTasksAssignedTo(final Bucket bucket) {
+    /*public static List<Map<String, Object>> getTasksAssignedTo(final Bucket bucket) {
         String queryStr = "SELECT _id,(SELECT _id,_type,active," +
                 "address,company,createdON,name,`password`,phone FROM `" + bucket.name() + "` USE KEYS " +
                 "c.assignedTo)[0] AS assignedTo, createdON, description,history,name," +
@@ -163,7 +230,7 @@ public class Database {
                 "users, permalink from `" + bucket.name() + "` c";
         N1qlQueryResult queryResult = bucket.query(N1qlQuery.simple(queryStr));
         return extractResultOrThrow(queryResult);
-    }
+    }*/
 
 
 
