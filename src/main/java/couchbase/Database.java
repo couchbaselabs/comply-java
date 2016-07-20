@@ -271,6 +271,20 @@ public class Database {
         return new ResponseEntity<String>(user.content().toString(), HttpStatus.OK);
     }
 
+    public static ResponseEntity<String> taskAddUser(final Bucket bucket, JsonObject data) {
+        JsonDocument user = bucket.get(data.getString("email"));
+        JsonDocument task = bucket.get(data.getString("taskId"));
+        JsonObject jsonTask = task.content();
+        JsonArray taskUsers = jsonTask.getArray("users");
+        if(!taskUsers.toString().contains(data.getString("email"))) {
+            taskUsers.add(data.getString("email"));
+        }
+        jsonTask.put("users", taskUsers);
+        task = JsonDocument.create(jsonTask.getString("_id"), jsonTask);
+        bucket.upsert(task);
+        return new ResponseEntity<String>(user.content().toString(), HttpStatus.OK);
+    }
+
 
     /*
      * Convert query results into a more friendly List object

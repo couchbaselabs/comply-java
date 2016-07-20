@@ -103,12 +103,6 @@ public class Application implements Filter {
     }
 
 
-
-    @RequestMapping(value="/project/link/{url}", method= RequestMethod.GET)
-    public Object getProjectByLink(@PathVariable("url") String url) {
-        return new ResponseEntity<String>(JsonObject.create().put("url", url).toString(), HttpStatus.OK);
-    }
-
     @RequestMapping(value="/project/get/{projectId}", method= RequestMethod.GET)
     public Object getProjectById(@PathVariable("projectId") String projectId) {
         return Database.getProjectById(bucket(), projectId);
@@ -147,17 +141,9 @@ public class Application implements Filter {
         return Database.projectAddUser(bucket(), jsonData);
     }
 
-    @RequestMapping(value="/project/getUsers/{projectId}", method= RequestMethod.GET)
-    public Object getUsersByProjectId(@PathVariable("projectId") String projectId) {
-        return new ResponseEntity<String>(JsonObject.create().put("projectId", projectId).toString(), HttpStatus.OK);
-    }
 
 
 
-    @RequestMapping(value="/task/link/{url}", method= RequestMethod.GET)
-    public Object getTaskByUrl(@PathVariable("url") String url) {
-        return new ResponseEntity<String>(JsonObject.create().put("url", url).toString(), HttpStatus.OK);
-    }
 
     @RequestMapping(value="/task/get/{taskId}", method= RequestMethod.GET)
     public Object getTaskById(@PathVariable("taskId") String taskId) {
@@ -182,7 +168,8 @@ public class Application implements Filter {
 
     @RequestMapping(value="/task/addUser", method= RequestMethod.POST)
     public Object taskAddUser(@RequestBody String json) {
-        return new ResponseEntity<String>(JsonObject.create().put("userId", 1).toString(), HttpStatus.OK);
+        JsonObject jsonData = JsonObject.fromJson(json);
+        return Database.taskAddUser(bucket(), jsonData);
     }
 
     @RequestMapping(value="/task/assignUser", method= RequestMethod.POST)
@@ -195,11 +182,6 @@ public class Application implements Filter {
     public Object taskAddHistory(@RequestBody String json) {
         JsonObject jsonData = JsonObject.fromJson(json);
         return Database.taskAddHistory(bucket(), jsonData);
-    }
-
-    @RequestMapping(value="/task/addPhoto", method= RequestMethod.POST)
-    public Object taskAddPhoto(@RequestBody String json) {
-        return new ResponseEntity<String>(JsonObject.create().put("userId", 1).toString(), HttpStatus.OK);
     }
 
 }
