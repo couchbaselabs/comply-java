@@ -31,17 +31,17 @@ export class AuthManager {
         }
     }
 
-    getUserEmail() {
+    getUserName() {
         if (localStorage.getItem("user")) {
-            return JSON.parse(localStorage.getItem("user")).email;
+            return JSON.parse(localStorage.getItem("user")).username;
         } else {
             return null;
         }
     }
 
-    login(email: string, password: string) {
+    login(username: string, password: string) {
         return new Promise((resolve, reject) => {
-            this.utility.makeGetRequest("/api/user/login", [email, password]).then((result) => {
+            this.utility.makeGetRequest("/api/user/login", [username, password]).then((result) => {
                 if(result) {
                     localStorage.setItem("user", JSON.stringify(result));
                     resolve(result);

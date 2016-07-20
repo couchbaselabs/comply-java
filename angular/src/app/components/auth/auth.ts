@@ -37,13 +37,13 @@ export class AuthPage {
         console.log(companyId);
     }
 
-    login(email: string, password: string) {
-        if (!email || email == "") {
-            console.error("Email must exist");
+    login(username: string, password: string) {
+        if (!username || username == "") {
+            console.error("Username must exist");
         } else if (!password || password == "") {
             console.error("Password must exist");
         } else {
-            this.authManager.login(email, password).then((result) => {
+            this.authManager.login(username, password).then((result) => {
                 this.router.navigate(["/"]);
             }, (error) => {
                 console.error(error);
@@ -51,7 +51,7 @@ export class AuthPage {
         }
     }
 
-    register(firstname: string, lastname: string, street: string, city: string, state: string, zip: string, country: string, phone: string, email: string, password: string, company: string) {
+    register(firstname: string, lastname: string, street: string, city: string, state: string, zip: string, country: string, phone: string, username: string, password: string, company: string) {
         var postBody: IUser = {
             name: {
                 first: firstname,
@@ -64,13 +64,13 @@ export class AuthPage {
                 zip: zip,
                 country: country
             },
-            email: email,
+            username: username,
             phone: phone,
             password: password,
             company: company
         }
         this.authManager.register(postBody).then((result) => {
-            this.authManager.login(email, password).then((result) => {
+            this.authManager.login(username, password).then((result) => {
                 this.router.navigate(["/"]);
             }, (error) => {
                 console.error(error);

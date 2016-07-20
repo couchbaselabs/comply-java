@@ -70,7 +70,7 @@ export class TasksPage {
 
     addUser(projectUser: string) {
         if (projectUser && projectUser != "") {
-            this.utility.makePostRequest("/api/project/addUser", [], {email: projectUser, projectId: this.project._id}).then((result) => {
+            this.utility.makePostRequest("/api/project/addUser", [], {username: projectUser, projectId: this.project._id}).then((result) => {
                 this.project.users.unshift(result);
             }, (error) => {
                 console.error(error);

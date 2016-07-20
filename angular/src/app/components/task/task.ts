@@ -75,7 +75,7 @@ export class TaskPage {
 
     addUser(taskUser: string) {
         if (taskUser && taskUser != "") {
-            this.utility.makePostRequest("/api/task/addUser", [], {email: taskUser, taskId: this.taskId}).then((result) => {
+            this.utility.makePostRequest("/api/task/addUser", [], {username: taskUser, taskId: this.taskId}).then((result) => {
                 this.task.users.unshift(<IUser> result);
             }, (error) => {
                 console.error(error);

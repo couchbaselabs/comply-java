@@ -20,7 +20,7 @@ public class Database {
 
 
     public static List<Map<String, Object>> getUserById(final Bucket bucket, String userId) {
-        String queryStr = "SELECT _id, _type, name, address, company, email, phone, `password` " +
+        String queryStr = "SELECT _id, _type, name, address, company, username, phone, `password` " +
                        "FROM `" + bucket.name() + "` AS users " +
                        "WHERE META(users).id = $1";
         ParameterizedN1qlQuery query = ParameterizedN1qlQuery.parameterized(queryStr, JsonArray.create().add(userId));
@@ -29,37 +29,25 @@ public class Database {
     }
 
     public static List<Map<String, Object>> getUsers(final Bucket bucket) {
-        String queryStr = "SELECT _id, _type, name, address, company, email, phone, `password` FROM `" + bucket.name() + "` WHERE _type = 'User'";
+        String queryStr = "SELECT _id, _type, name, address, company, username, phone, `password` FROM `" + bucket.name() + "` WHERE _type = 'User'";
         N1qlQueryResult queryResult = bucket.query(N1qlQuery.simple(queryStr));
         return extractResultOrThrow(queryResult);
     }
 
-    public static ResponseEntity<String> login(final Bucket bucket, String email, String password) {
-        /*String queryStr = "SELECT _id, active, address, company, createdON, email, name, `password`, phone " +
-                       "FROM `" + bucket.name() + "` AS users " +
-                       "WHERE _type = 'User' AND email = $1";
-        ParameterizedN1qlQuery query = ParameterizedN1qlQuery.parameterized(queryStr, JsonArray.create().add(email));
-        N1qlQueryResult queryResult = bucket.query(query);*/
-        JsonDocument user = bucket.get(email);
+    public static ResponseEntity<String> login(final Bucket bucket, String username, String password) {
+        JsonDocument user = bucket.get(username);
         JsonObject jsonUser = user.content();
         if(BCrypt.checkpw(password, jsonUser.getString("password"))) {
             return new ResponseEntity<String>(user.content().toString(), HttpStatus.OK);
         } else {
             return new ResponseEntity<String>(user.content().toString(), HttpStatus.OK);
         }
-        //return extractResultOrThrow(queryResult);
     }
 
     public static ResponseEntity<String> createUser(final Bucket bucket, JsonObject data) {
-        JsonDocument document = JsonDocument.create(data.getString("email"), data.put("_id", data.getString("email")).put("_type", "User").put("password", BCrypt.hashpw(data.getString("password"), BCrypt.gensalt())));
+        JsonDocument document = JsonDocument.create(data.getString("username"), data.put("_id", data.getString("username")).put("_type", "User").put("password", BCrypt.hashpw(data.getString("password"), BCrypt.gensalt())));
         bucket.upsert(document);
         return new ResponseEntity<String>(document.content().toString(), HttpStatus.OK);
-        //bucket.upsert(data.getString("_id"), data);
-        /*String queryStr = "UPSERT INTO `" + bucket.name() + "` (KEY, VALUE) VALUES " +
-                "($1, {'_type': 'User', '_id': $2, 'createdON': $3, 'active': true})";
-        ParameterizedN1qlQuery query = ParameterizedN1qlQuery.parameterized(queryStr, JsonArray.create().add(data.getString("email")).add(data.getString("email")).add("1111"));
-        N1qlQueryResult queryResult = bucket.query(query);
-        return extractResultOrThrow(queryResult);*/
     }
 
     public static List<Map<String, Object>> getCompanyById(final Bucket bucket, String companyId) {
@@ -81,11 +69,6 @@ public class Database {
         JsonDocument document = JsonDocument.create(data.getString("website"), data.put("_id", data.getString("website")).put("_type", "Company"));
         bucket.upsert(document);
         return new ResponseEntity<String>(document.content().toString(), HttpStatus.OK);
-        /*String queryStr = "UPSERT INTO `" + bucket.name() + "` (KEY, VALUE) VALUES " +
-                "($1, {'_type': 'Company', '_id': $2, 'createdON': $3, 'active': true})";
-        ParameterizedN1qlQuery query = ParameterizedN1qlQuery.parameterized(queryStr, JsonArray.create().add(data.getString("website")).add(data.getString("website")).add("1111"));
-        N1qlQueryResult queryResult = bucket.query(query);
-        return extractResultOrThrow(queryResult);*/
     }
 
 
@@ -139,20 +122,15 @@ public class Database {
                 .put("success", true)
                 .put("data", data);
         return new ResponseEntity<String>(data.toString(), HttpStatus.OK);
-        /*String queryStr = "UPSERT INTO `" + bucket.name() + "` (KEY, VALUE) VALUES " +
-                "($1, {'_type': 'Company', '_id': $2, 'createdON': $3, 'active': true})";
-        ParameterizedN1qlQuery query = ParameterizedN1qlQuery.parameterized(queryStr, JsonArray.create().add(data.getString("website")).add(data.getString("website")).add("1111"));
-        N1qlQueryResult queryResult = bucket.query(query);
-        return extractResultOrThrow(queryResult);*/
     }
 
     public static ResponseEntity<String> projectAddUser(final Bucket bucket, JsonObject data) {
-        JsonDocument user = bucket.get(data.getString("email"));
+        JsonDocument user = bucket.get(data.getString("username"));
         JsonDocument project = bucket.get(data.getString("projectId"));
         JsonObject jsonProject = project.content();
         JsonArray projectUsers = jsonProject.getArray("users");
-        if(!projectUsers.toString().contains(data.getString("email"))) {
-            projectUsers.add(data.getString("email"));
+        if(!projectUsers.toString().contains(data.getString("username"))) {
+            projectUsers.add(data.getString("username"));
         }
         jsonProject.put("users", projectUsers);
         project = JsonDocument.create(jsonProject.getString("_id"), jsonProject);
@@ -221,10 +199,6 @@ public class Database {
         project = JsonDocument.create(jsonProject.getString("_id"), jsonProject);
         bucket.upsert(project);
 
-        /*JsonObject responseData = JsonObject.create()
-                .put("success", true)
-                .put("data", data);
-        return new ResponseEntity<String>(responseData.toString(), HttpStatus.OK);*/
         String queryStr = "SELECT c._id,c.createdON,c.name,c.description," +
                 "(SELECT _id,_type,active,address,company,createdON,name,`password`,phone " +
                 "FROM `" + bucket.name() + "` USE KEYS c.owner)[0] AS owner,c.status, (SELECT _id,_type," +
@@ -247,10 +221,6 @@ public class Database {
         task = JsonDocument.create(data.getString("taskId"), jsonTask);
         bucket.upsert(task);
 
-        /*JsonObject responseData = JsonObject.create()
-                .put("success", true)
-                .put("data", data);
-        return new ResponseEntity<String>(responseData.toString(), HttpStatus.OK);*/
         String queryStr = "SELECT ($1) AS log, (SELECT _id,_type,active," +
                 "address,company,createdON,name,`password`,phone " +
                 "FROM `" + bucket.name() + "` USE KEYS c._id)[0] AS `user`,($2) AS createdAt " +
@@ -272,12 +242,12 @@ public class Database {
     }
 
     public static ResponseEntity<String> taskAddUser(final Bucket bucket, JsonObject data) {
-        JsonDocument user = bucket.get(data.getString("email"));
+        JsonDocument user = bucket.get(data.getString("username"));
         JsonDocument task = bucket.get(data.getString("taskId"));
         JsonObject jsonTask = task.content();
         JsonArray taskUsers = jsonTask.getArray("users");
-        if(!taskUsers.toString().contains(data.getString("email"))) {
-            taskUsers.add(data.getString("email"));
+        if(!taskUsers.toString().contains(data.getString("username"))) {
+            taskUsers.add(data.getString("username"));
         }
         jsonTask.put("users", taskUsers);
         task = JsonDocument.create(jsonTask.getString("_id"), jsonTask);

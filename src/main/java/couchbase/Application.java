@@ -73,9 +73,9 @@ public class Application implements Filter {
         return Database.getUsers(bucket());
     }
 
-    @RequestMapping(value="/user/login/{email}/{password}", method= RequestMethod.GET)
-    public Object login(@PathVariable("email") String email, @PathVariable("password") String password) {
-        return Database.login(bucket(), email, password);
+    @RequestMapping(value="/user/login/{username}/{password}", method= RequestMethod.GET)
+    public Object login(@PathVariable("username") String username, @PathVariable("password") String password) {
+        return Database.login(bucket(), username, password);
     }
 
     @RequestMapping(value="/user/create", method= RequestMethod.POST)
