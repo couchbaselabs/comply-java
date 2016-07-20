@@ -45,8 +45,6 @@ export class TaskPage {
     getTask(taskId) {
         this.utility.makeGetRequest("/api/task/get", [taskId]).then((result: any) => {
             this.task = <ITask> result[0].task;
-            console.log("this.history:",result[0].task.history);
-            console.log("TASK: " + JSON.stringify(this.task));
             this.getProject(result[0].projectId);
         }, (error) => {
             console.error(error);
@@ -56,7 +54,6 @@ export class TaskPage {
     getProject(projectId: string) {
         this.utility.makeGetRequest("/api/project/get", [projectId]).then((result) => {
             this.project = <IProject> result[0];
-            console.log("PROJECT: ", this.project);
         }, (error) => {
             console.log(error);
         });

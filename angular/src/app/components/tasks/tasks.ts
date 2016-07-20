@@ -47,7 +47,6 @@ export class TasksPage {
     getProject(projectId: string) {
         this.utility.makeGetRequest("/api/project/get", [projectId]).then((result) => {
             this.project = <IProject> result[0];
-            console.log("This particular project:",this.project["0"]);
         }, (error) => {
             console.log(error);
         });

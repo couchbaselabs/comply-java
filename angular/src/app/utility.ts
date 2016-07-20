@@ -23,7 +23,7 @@ export class Utility {
         if(query) {
             fullUrl += this.jsonToQueryString(query);
         }
-        console.log("DEBUG: POST FULL URL:",fullUrl," BODY:",JSON.stringify(body));
+        console.log("DEBUG: POST FULL URL: ", fullUrl, " BODY: ", JSON.stringify(body));
         return new Promise((resolve, reject) => {
             var requestHeaders = new Headers();
             requestHeaders.append("Content-Type", "application/json");
@@ -34,6 +34,7 @@ export class Utility {
                 headers: requestHeaders
             }))
             .subscribe((success) => {
+                console.log("DEBUG: POST RESPONSE: ", fullUrl, ": ", success.json());
                 resolve(success.json());
             }, (error) => {
                 reject(error.json());
@@ -53,11 +54,11 @@ export class Utility {
         if(query) {
             fullUrl += this.jsonToQueryString(query);
         }
-        console.log("DEBUG: GET FULL URL:",fullUrl);
+        console.log("DEBUG: GET FULL URL: ", fullUrl);
         return new Promise((resolve, reject) => {
             this.http.get(fullUrl)
             .subscribe((success) => {
-                console.log("DEBUG: GET RESPONSE:",fullUrl,":",success.json());
+                console.log("DEBUG: GET RESPONSE: ", fullUrl, ": ", success.json());
                 resolve(success.json());
             }, (error) => {
                 reject(error.json());

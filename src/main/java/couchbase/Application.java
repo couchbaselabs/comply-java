@@ -271,11 +271,6 @@ public class Application implements Filter {
         return Database.getTasksAssignedToUserId(bucket(), userId);
     }
 
-    /*@RequestMapping(value="/task/getAssignedTo", method= RequestMethod.GET)
-    public Object getTasksAssignedTo() {
-        return Database.getTasksAssignedTo(bucket());
-    }*/
-
     /*
      * Endpoint for creating a new task for an already existing project
      */

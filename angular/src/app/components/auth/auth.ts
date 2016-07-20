@@ -33,10 +33,6 @@ export class AuthPage {
         });
     }
 
-    changeCompany(companyId) {
-        console.log(companyId);
-    }
-
     login(username: string, password: string) {
         if (!username || username == "") {
             console.error("Username must exist");

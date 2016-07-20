@@ -159,6 +159,9 @@ public class Database {
         return extractResultOrThrow(queryResult);
     }
 
+    /*
+     * Get all projects from the database for a particular owner id
+     */
     public static List<Map<String, Object>> getProjectsByOwnerId(final Bucket bucket, String ownerId) {
         String queryStr = "SELECT _id, _type, owner, users, tasks, description, name FROM `" + bucket.name() + "` WHERE _type = 'Project' and owner = $1";
         ParameterizedN1qlQuery query = ParameterizedN1qlQuery.parameterized(queryStr, JsonArray.create().add(ownerId));
@@ -166,12 +169,18 @@ public class Database {
         return extractResultOrThrow(queryResult);
     }
 
+    /*
+     * Get all projects based on the document _type property
+     */
     public static List<Map<String, Object>> getProjects(final Bucket bucket) {
         String queryStr = "SELECT _id, _type, name, description, tasks, users, owner FROM `" + bucket.name() + "` AS projects WHERE _type = 'Project'";
         N1qlQueryResult queryResult = bucket.query(N1qlQuery.simple(queryStr));
         return extractResultOrThrow(queryResult);
     }
 
+    /*
+     * Get all projects for a user that has access permissions to them based on being in the users array
+     */
     public static List<Map<String, Object>> getOtherProjectsByUserId(final Bucket bucket, String userId) {
         String queryStr = "SELECT _id, _type, name, description, tasks, users, owner FROM `" + bucket.name() + "` WHERE _type = 'Project' AND ANY x IN users SATISFIES x = $1 END";
         ParameterizedN1qlQuery query = ParameterizedN1qlQuery.parameterized(queryStr, JsonArray.create().add(userId));
@@ -179,21 +188,43 @@ public class Database {
         return extractResultOrThrow(queryResult);
     }
 
+    /*
+     * Create a new project in the database
+     */
     public static ResponseEntity<String> createProject(final Bucket bucket, JsonObject data) {
+        JsonObject response;
+        HttpStatus responseStatus;
         String documentId = UUID.randomUUID().toString();
         JsonArray users = data.getArray("users");
         users.add(data.getString("owner"));
         JsonDocument document = JsonDocument.create(documentId, data.put("_id", documentId).put("_type", "Project").put("users", users).put("createdON", (new Date()).toString()));
-        bucket.upsert(document);
-        JsonObject responseData = JsonObject.create()
-                .put("success", true)
-                .put("data", data);
-        return new ResponseEntity<String>(data.toString(), HttpStatus.OK);
+        try {
+            bucket.upsert(document);
+            response = document.content();
+            responseStatus = HttpStatus.OK;
+        } catch (Exception e) {
+            response = JsonObject.create().put("error", 409).put("message", e.getMessage());
+            responseStatus = HttpStatus.INTERNAL_SERVER_ERROR;
+        }
+        return new ResponseEntity<String>(response.toString(), responseStatus);
     }
 
+    /*
+     * Add a user to a particular project based on the existing user id and project id
+     */
     public static ResponseEntity<String> projectAddUser(final Bucket bucket, JsonObject data) {
+        JsonObject response;
+        HttpStatus responseStatus;
         JsonDocument user = bucket.get(data.getString("username"));
+        if(user == null) {
+            response = JsonObject.create().put("error", 400).put("message", "The user does not exist");
+            responseStatus = HttpStatus.BAD_REQUEST;
+        }
         JsonDocument project = bucket.get(data.getString("projectId"));
+        if(project == null) {
+            response = JsonObject.create().put("error", 400).put("message", "The project does not exist");
+            responseStatus = HttpStatus.BAD_REQUEST;
+        }
         JsonObject jsonProject = project.content();
         JsonArray projectUsers = jsonProject.getArray("users");
         if(!projectUsers.toString().contains(data.getString("username"))) {
@@ -201,116 +232,205 @@ public class Database {
         }
         jsonProject.put("users", projectUsers);
         project = JsonDocument.create(jsonProject.getString("_id"), jsonProject);
-        bucket.upsert(project);
-        return new ResponseEntity<String>(user.content().toString(), HttpStatus.OK);
+        try {
+            bucket.upsert(project);
+            response = user.content();
+            responseStatus = HttpStatus.OK;
+        } catch (Exception e) {
+            response = JsonObject.create().put("error", 409).put("message", e.getMessage());
+            responseStatus = HttpStatus.INTERNAL_SERVER_ERROR;
+        }
+        return new ResponseEntity<String>(response.toString(), responseStatus);
     }
 
 
+    /*
+     * ###################################################
+     * ################## Task Endpoints #################
+     * ###################################################
+     */
 
+
+    /*
+     * Get all tasks assigned to a particular user id from the database.  The assigned to information is expanded instead of providing
+     * just a user id.  The owner information is expanded instead of showing just the user id. The users array is expanded instead of
+     * showing a list of user ids.  An array of objects is returned.
+     */
     public static List<Map<String, Object>> getTasksAssignedToUserId(final Bucket bucket, String userId) {
-        String queryStr = "SELECT _id,(SELECT _id,_type,active," +
-                "address,company,createdON,name,`password`,phone FROM `" + bucket.name() + "` USE KEYS " +
-                "c.assignedTo)[0] AS assignedTo, createdON, description,history,name," +
-                "(SELECT _id,_type,active,address,company,createdON,name,`password`,phone " +
-                "FROM `" + bucket.name() + "` USE KEYS c.owner)[0] as owner,(SELECT _id,_type,active,address," +
-                "company,createdON,name,`password`,phone FROM `" + bucket.name() + "` USE KEYS c.users) AS " +
-                "users, permalink from `" + bucket.name() + "` c WHERE c.assignedTo=$1";
+        String queryStr = "SELECT _id, (SELECT _id, _type, active," +
+                "address, company, createdON, name, `password`, phone FROM `" + bucket.name() + "` USE KEYS " +
+                "c.assignedTo)[0] AS assignedTo, createdON, description, history, name," +
+                "(SELECT _id, _type, active, address, company, createdON, name, `password`, phone " +
+                "FROM `" + bucket.name() + "` USE KEYS c.owner)[0] as owner, (SELECT _id, _type, active, address," +
+                "company, createdON, name, `password`, phone FROM `" + bucket.name() + "` USE KEYS c.users) AS " +
+                "users, permalink FROM `" + bucket.name() + "` c WHERE c.assignedTo = $1";
         ParameterizedN1qlQuery query = ParameterizedN1qlQuery.parameterized(queryStr, JsonArray.create().add(userId));
         N1qlQueryResult queryResult = bucket.query(query);
         return extractResultOrThrow(queryResult);
     }
 
-    /*public static List<Map<String, Object>> getTasksAssignedTo(final Bucket bucket) {
-        String queryStr = "SELECT _id,(SELECT _id,_type,active," +
-                "address,company,createdON,name,`password`,phone FROM `" + bucket.name() + "` USE KEYS " +
-                "c.assignedTo)[0] AS assignedTo, createdON, description,history,name," +
-                "(SELECT _id,_type,active,address,company,createdON,name,`password`,phone " +
-                "FROM `" + bucket.name() + "` USE KEYS c.owner)[0] as owner,(SELECT _id,_type,active,address," +
-                "company,createdON,name,`password`,phone FROM `" + bucket.name() + "` USE KEYS c.users) AS " +
-                "users, permalink from `" + bucket.name() + "` c";
-        N1qlQueryResult queryResult = bucket.query(N1qlQuery.simple(queryStr));
-        return extractResultOrThrow(queryResult);
-    }*/
-
-
-
+    /*
+     * Get a task from the database based on its task id.  Response includes the parent project id in which the task is
+     * associated with, expanded assigned user information, expanded owner information, and expanded information for any user
+     * that is attached to the task.  Returns an array of objects.
+     */
     public static List<Map<String, Object>> getTaskById(final Bucket bucket, String taskId) {
-        String queryStr = "SELECT (p._id) AS projectId,(SELECT _id, " +
-                "(SELECT _id,_type,active,address,company,createdON,name,`password`,phone " +
+        String queryStr = "SELECT (p._id) AS projectId, (SELECT _id, " +
+                "(SELECT _id, _type, active, address, company, createdON, name, `password`, phone " +
                 "FROM `" + bucket.name() + "` USE KEYS c.assignedTo)[0] AS assignedTo, createdON, " +
-                "description,(select t.log, t.createdAt, (SELECT _id,_type,active,address, " +
-                "company,createdON,name,`password`,phone FROM `" + bucket.name() + "` USE KEYS t.`user`)[0] " +
-                "as `user` from `" + bucket.name() + "` r UNNEST r.history t where r._id=$1) as history,name, " +
-                "(SELECT _id,_type,active,address,company, createdON,name,`password`,phone " +
-                "FROM `" + bucket.name() + "` USE KEYS c.owner)[0] as owner,(SELECT _id,_type,active,address, " +
-                "company,createdON,name,`password`,phone FROM `" + bucket.name() + "` USE KEYS c.users) " +
-                "AS users, permalink from `" + bucket.name() + "` c WHERE c._id=$1)[0] as task FROM `" + bucket.name() + "` " +
-                "p WHERE ANY x IN tasks SATISFIES x=$1 END ";
+                "description, (select t.log, t.createdAt, (SELECT _id, _type, active, address, " +
+                "company, createdON, name, `password`, phone FROM `" + bucket.name() + "` USE KEYS t.`user`)[0] " +
+                "AS `user` FROM `" + bucket.name() + "` r UNNEST r.history t WHERE r._id = $1) AS history,name, " +
+                "(SELECT _id, _type, active, address, company, createdON, name, `password`, phone " +
+                "FROM `" + bucket.name() + "` USE KEYS c.owner)[0] as owner, (SELECT _id, _type, active, address, " +
+                "company, createdON, name, `password`, phone FROM `" + bucket.name() + "` USE KEYS c.users) " +
+                "AS users, permalink FROM `" + bucket.name() + "` c WHERE c._id= $1)[0] AS task FROM `" + bucket.name() + "` " +
+                "p WHERE ANY x IN tasks SATISFIES x = $1 END ";
         ParameterizedN1qlQuery query = ParameterizedN1qlQuery.parameterized(queryStr, JsonArray.create().add(taskId));
         N1qlQueryResult queryResult = bucket.query(query);
         return extractResultOrThrow(queryResult);
     }
 
+    /*
+     * Create a task for an existing project assigned to an existing user
+     */
     public static List<Map<String, Object>> createTask(final Bucket bucket, String projectId, JsonObject data) {
+        JsonObject response = null;
+        HttpStatus responseStatus = null;
         String taskId = UUID.randomUUID().toString();
         JsonArray users = data.getArray("users");
         users.add(data.getString("owner"));
         JsonDocument document = JsonDocument.create(taskId, data.put("_id", taskId).put("_type", "Task").put("users", users).put("createdON", (new Date()).toString()));
-        bucket.upsert(document);
+
+        try {
+            bucket.upsert(document);
+        } catch (Exception e) {
+            response = JsonObject.create().put("error", 409).put("message", e.getMessage());
+            responseStatus = HttpStatus.INTERNAL_SERVER_ERROR;
+        }
 
         JsonDocument project = bucket.get(projectId);
+        if(project == null) {
+            response = JsonObject.create().put("error", 400).put("message", "The project id does not exist");
+            responseStatus = HttpStatus.BAD_REQUEST;
+        }
         JsonObject jsonProject = project.content();
         JsonArray jsonProjectTasks = jsonProject.getArray("tasks");
         jsonProjectTasks.add(taskId);
         jsonProject.put("tasks", jsonProjectTasks);
         project = JsonDocument.create(jsonProject.getString("_id"), jsonProject);
-        bucket.upsert(project);
+        try {
+            bucket.upsert(project);
+        } catch (Exception e) {
+            response = JsonObject.create().put("error", 409).put("message", e.getMessage());
+            responseStatus = HttpStatus.INTERNAL_SERVER_ERROR;
+        }
 
-        String queryStr = "SELECT c._id,c.createdON,c.name,c.description," +
-                "(SELECT _id,_type,active,address,company,createdON,name,`password`,phone " +
-                "FROM `" + bucket.name() + "` USE KEYS c.owner)[0] AS owner,c.status, (SELECT _id,_type," +
-                "active,address,company,createdON,name,`password`,phone FROM `" + bucket.name() + "` " +
-                " USE KEYS c.users) AS users, c.permalink from `" + bucket.name() + "` " +
-                " c WHERE c._id=$1";
+        if(response != null && responseStatus != null) {
+            List<Map<String, Object>> responseMap = new ArrayList<Map<String, Object>>();
+            responseMap.add(response.toMap());
+            return responseMap;
+        }
+
+        String queryStr = "SELECT c._id, c.createdON, c.name, c.description," +
+                "(SELECT _id, _type, active, address, company, createdON, name, `password`, phone " +
+                "FROM `" + bucket.name() + "` USE KEYS c.owner)[0] AS owner, c.status, (SELECT _id, _type," +
+                "active, address, company, createdON, name, `password`, phone FROM `" + bucket.name() + "` " +
+                " USE KEYS c.users) AS users, c.permalink FROM `" + bucket.name() + "` " +
+                " c WHERE c._id = $1";
         N1qlParams params = N1qlParams.build().consistency(ScanConsistency.REQUEST_PLUS);
         ParameterizedN1qlQuery query = ParameterizedN1qlQuery.parameterized(queryStr, JsonArray.create().add(taskId), params);
         N1qlQueryResult queryResult = bucket.query(query);
         return extractResultOrThrow(queryResult);
     }
 
+    /*
+     * Add a new comment to the history of a task based on the task id and user id.  Returns the comment along with the
+     * expanded user information that created it.  An array of objects are returned.
+     */
     public static List<Map<String, Object>> taskAddHistory(final Bucket bucket, JsonObject data) {
+        JsonObject response = null;
+        HttpStatus responseStatus = null;
         JsonDocument task = bucket.get(data.getString("taskId"));
+        if(task == null) {
+            response = JsonObject.create().put("error", 400).put("message", "The task id does not exist");
+            responseStatus = HttpStatus.BAD_REQUEST;
+        }
         JsonObject jsonTask = task.content();
         JsonArray taskHistory = jsonTask.getArray("history");
         JsonObject currentTaskHistory = JsonObject.create().put("log", data.getString("log")).put("user", data.getString("userId")).put("createdAt", (new Date()).toString());
         taskHistory.add(currentTaskHistory);
         jsonTask.put("history", taskHistory);
         task = JsonDocument.create(data.getString("taskId"), jsonTask);
-        bucket.upsert(task);
+        try {
+            bucket.upsert(task);
+        } catch (Exception e) {
+            response = JsonObject.create().put("error", 409).put("message", e.getMessage());
+            responseStatus = HttpStatus.INTERNAL_SERVER_ERROR;
+        }
 
-        String queryStr = "SELECT ($1) AS log, (SELECT _id,_type,active," +
-                "address,company,createdON,name,`password`,phone " +
+        if(response != null && responseStatus != null) {
+            List<Map<String, Object>> responseMap = new ArrayList<Map<String, Object>>();
+            responseMap.add(response.toMap());
+            return responseMap;
+        }
+
+        String queryStr = "SELECT ($1) AS log, (SELECT _id, _type, active," +
+                "address, company, createdON, name, `password`, phone " +
                 "FROM `" + bucket.name() + "` USE KEYS c._id)[0] AS `user`,($2) AS createdAt " +
-                " FROM `" + bucket.name() + "` c WHERE c._id=$3 ";
+                " FROM `" + bucket.name() + "` c WHERE c._id = $3 ";
         N1qlParams params = N1qlParams.build().consistency(ScanConsistency.REQUEST_PLUS);
         ParameterizedN1qlQuery query = ParameterizedN1qlQuery.parameterized(queryStr, JsonArray.create().add(data.getString("log")).add(currentTaskHistory.getString("createdAt")).add(data.getString("userId")), params);
         N1qlQueryResult queryResult = bucket.query(query);
         return extractResultOrThrow(queryResult);
     }
 
+    /*
+     * Assign a particular existing user to an existing task
+     */
     public static ResponseEntity<String> taskAssignUser(final Bucket bucket, JsonObject data) {
+        JsonObject response;
+        HttpStatus responseStatus;
         JsonDocument user = bucket.get(data.getString("userId"));
+        if(user == null) {
+            response = JsonObject.create().put("error", 400).put("message", "The user id does not exist");
+            responseStatus = HttpStatus.BAD_REQUEST;
+        }
         JsonDocument task = bucket.get(data.getString("taskId"));
+        if(task == null) {
+            response = JsonObject.create().put("error", 400).put("message", "The task id does not exist");
+            responseStatus = HttpStatus.BAD_REQUEST;
+        }
         JsonObject jsonTask = task.content();
         jsonTask.put("assignedTo", data.getString("userId"));
         task = JsonDocument.create(jsonTask.getString("_id"), jsonTask);
-        bucket.upsert(task);
-        return new ResponseEntity<String>(user.content().toString(), HttpStatus.OK);
+        try {
+            bucket.upsert(task);
+            response = user.content();
+            responseStatus = HttpStatus.OK;
+        } catch (Exception e) {
+            response = JsonObject.create().put("error", 409).put("message", e.getMessage());
+            responseStatus = HttpStatus.INTERNAL_SERVER_ERROR;
+        }
+        return new ResponseEntity<String>(response.toString(), responseStatus);
     }
 
+    /*
+     * Add a user to an existing task, but not make it the assigned user
+     */
     public static ResponseEntity<String> taskAddUser(final Bucket bucket, JsonObject data) {
+        JsonObject response;
+        HttpStatus responseStatus;
         JsonDocument user = bucket.get(data.getString("username"));
+        if(user == null) {
+            response = JsonObject.create().put("error", 400).put("message", "The user id does not exist");
+            responseStatus = HttpStatus.BAD_REQUEST;
+        }
         JsonDocument task = bucket.get(data.getString("taskId"));
+        if(task == null) {
+            response = JsonObject.create().put("error", 400).put("message", "The task id does not exist");
+            responseStatus = HttpStatus.BAD_REQUEST;
+        }
         JsonObject jsonTask = task.content();
         JsonArray taskUsers = jsonTask.getArray("users");
         if(!taskUsers.toString().contains(data.getString("username"))) {
@@ -318,8 +438,15 @@ public class Database {
         }
         jsonTask.put("users", taskUsers);
         task = JsonDocument.create(jsonTask.getString("_id"), jsonTask);
-        bucket.upsert(task);
-        return new ResponseEntity<String>(user.content().toString(), HttpStatus.OK);
+        try {
+            bucket.upsert(task);
+            response = user.content();
+            responseStatus = HttpStatus.OK;
+        } catch (Exception e) {
+            response = JsonObject.create().put("error", 409).put("message", e.getMessage());
+            responseStatus = HttpStatus.INTERNAL_SERVER_ERROR;
+        }
+        return new ResponseEntity<String>(response.toString(), responseStatus);
     }
 
 
